@@ -415,4 +415,3 @@ class FreeRADIUSEAP extends Model {
         freeradius_eapconf_resync();
     }
 }
-

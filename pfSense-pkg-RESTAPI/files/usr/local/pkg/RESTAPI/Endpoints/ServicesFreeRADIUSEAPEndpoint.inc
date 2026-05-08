@@ -21,4 +21,3 @@ class ServicesFreeRADIUSEAPEndpoint extends Endpoint {
         parent::__construct();
     }
 }
-
