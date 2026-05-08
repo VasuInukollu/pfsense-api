@@ -172,6 +172,16 @@ class Model {
     public bool $async;
 
     /**
+     * @var bool $dry_run
+     * If set to `true`, the public CRUD methods (`create()`, `update()`, `delete()`, `replace_all()`, `delete_many()`,
+     * `delete_all()`) will perform full validation but skip executing the protected `_create()`, `_update()`, and
+     * `_delete()` methods, skip writing changes to the pfSense configuration, and skip any `apply_*()` work. This
+     * allows clients to validate a payload without persisting any changes. Defaults to `false`. This value has no
+     * effect on read operations.
+     */
+    public bool $dry_run = false;
+
+    /**
      * @var Auth $client
      * The Auth object containing the username, IP address, and other authentication details of the individual interacting
      * with this Model. If no value is assigned, a default Auth object will be defined. Note: Some Models require
@@ -2227,6 +2237,12 @@ class Model {
             # Check if creating this object would put the total number of objects over the $many_maximum
             $this->check_many_maximum();
 
+            # When dry_run is enabled, skip the actual write/apply phase but still report the would-be result
+            if ($this->dry_run) {
+                self::clear_model_cache();
+                return $this;
+            }
+
             # Run the _create method
             $this->_create();
 
@@ -2320,6 +2336,12 @@ class Model {
 
         # Ensure all object Fields and validations succeed for proceeding.
         if ($this->validate(requires_id: true)) {
+            # When dry_run is enabled, skip the actual write/apply phase but still report the would-be result
+            if ($this->dry_run) {
+                self::clear_model_cache();
+                return $this;
+            }
+
             # Run the _update method
             $this->_update();
 
@@ -2400,6 +2422,23 @@ class Model {
         $new_objects = new ModelSet();
         if ($this->protected_model_query) {
             $new_objects = $initial_objects->query(query_params: $this->protected_model_query);
+        }
+
+        # When dry_run is enabled, validate each requested object against the existing protected ModelSet but
+        # do not mutate or persist the configuration. This still allows clients to detect duplicate or invalid
+        # entries before applying the replacement.
+        if ($this->dry_run) {
+            foreach ($data as $representation_object) {
+                unset($representation_object['id']);
+                $model_object = new $this(data: $representation_object, skip_init: true, client: $this->client);
+                # Assign a synthetic ID for uniqueness comparisons during validation
+                $model_object->id = count($new_objects->model_objects);
+                $model_object->validate(modelset: $new_objects);
+                $new_objects->model_objects[] = $model_object;
+            }
+
+            self::clear_model_cache();
+            return $new_objects;
         }
 
         # Before beginning validation, empty the stored values in the config path. Retain protected Models (if any).
@@ -2504,6 +2543,12 @@ class Model {
             # Block the deletion if will put us below the minimum number of objects required for this Model
             $this->check_many_minimum();
 
+            # When dry_run is enabled, skip the actual delete/apply phase but still report the would-be result
+            if ($this->dry_run) {
+                self::clear_model_cache();
+                return $this;
+            }
+
             # Run the _delete method
             $this->_delete();
 
@@ -2543,6 +2588,8 @@ class Model {
      *  enabled Models.
      * @param int $limit The maximum number of Model objects to retrieve. This is only applicable to $many
      *  enabled Models.
+     * @param bool $dry_run When `true`, propagate the dry_run flag to each matched Model object so the underlying
+     *  delete() is validated but not actually performed.
      * @param mixed ...$vl_query_params Qyery parameters that are passed in using variable-length arguments
      *  https://www.php.net/manual/en/functions.arguments.php#functions.variable-arg-list
      * @return ModelSet The queried ModelSet containing only Model objects that matched the query.
@@ -2552,6 +2599,7 @@ class Model {
         array $excluded = [],
         int $limit = 0,
         int $offset = 0,
+        bool $dry_run = false,
         ...$vl_query_params,
     ): ModelSet {
         # Merge the $query_params and any provided variable-length arguments into a single variable
@@ -2568,6 +2616,11 @@ class Model {
         # Obtain all Model objects that match the query of objects to be deleted
         $model_objects = self::query(query_params: $query_params, excluded: $excluded, limit: $limit, offset: $offset);
 
+        # Propagate the dry_run flag to each matched Model object so the underlying delete() honors it
+        foreach ($model_objects->model_objects as $model_object) {
+            $model_object->dry_run = $dry_run;
+        }
+
         # Reset the object cache as the config has changed
         self::clear_model_cache();
 
@@ -2577,10 +2630,17 @@ class Model {
 
     /**
      * Deletes all Model objects for this Model. This method is only available for $many Models without a $parent_model_class.
+     * @param bool $dry_run When `true`, propagate the dry_run flag to each Model object so the underlying delete()
+     * is validated but not actually performed.
      */
-    public static function delete_all(): ModelSet|Model {
+    public static function delete_all(bool $dry_run = false): ModelSet|Model {
         # Obtain all Model objects for this Model
         $model_objects = self::read_all();
+
+        # Propagate the dry_run flag to each Model object so the underlying delete() honors it
+        foreach ($model_objects->model_objects as $model_object) {
+            $model_object->dry_run = $dry_run;
+        }
 
         # Reset the object cache as the config has changed
         self::clear_model_cache();
