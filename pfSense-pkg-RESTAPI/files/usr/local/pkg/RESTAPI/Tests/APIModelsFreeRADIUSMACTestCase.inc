@@ -226,6 +226,3 @@ class APIModelsFreeRADIUSMACTestCase extends TestCase {
         );
     }
 }
-
-
-
