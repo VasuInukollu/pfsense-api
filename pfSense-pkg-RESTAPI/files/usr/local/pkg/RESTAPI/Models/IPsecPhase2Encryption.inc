@@ -5,6 +5,7 @@ namespace RESTAPI\Models;
 use RESTAPI\Core\Model;
 use RESTAPI\Dispatchers\IPsecApplyDispatcher;
 use RESTAPI\Fields\IntegerField;
+use RESTAPI\Fields\KeyLenField;
 use RESTAPI\Fields\StringField;
 use RESTAPI\Responses\ValidationError;
 
@@ -13,7 +14,7 @@ use RESTAPI\Responses\ValidationError;
  */
 class IPsecPhase2Encryption extends Model {
     public StringField $name;
-    public IntegerField $keylen;
+    public KeyLenField $keylen;
 
     public function __construct(mixed $id = null, mixed $parent_id = null, array $data = [], mixed ...$options) {
         # Obtain global p2 algorithm variables
@@ -34,36 +35,15 @@ class IPsecPhase2Encryption extends Model {
             internal_name: 'name',
             help_text: 'The name of the encryption algorithm to use for this P2 encryption item.',
         );
-        $this->keylen = new IntegerField(
+        $this->keylen = new KeyLenField(
             required: true,
+            choices_callable: 'get_supported_keylens',
             internal_name: 'keylen',
             conditions: ['name' => $this->get_keylen_enabled_algos()],
-            help_text: 'The key length for the encryption algorithm.',
+            help_text: 'The key length for the encryption algorithm. Use 0 to select key length automatically.',
         );
 
         parent::__construct($id, $parent_id, $data, ...$options);
-    }
-
-    /**
-     * Adds extra validation to the `keylen` field.
-     * @param int $keylen The incoming value to be validated.
-     * @returns int The validated value to be assigned.
-     * @throws ValidationError When the $keylen is not supported by the
-     * `name` field's assigned value.
-     */
-    public function validate_keylen(int $keylen): int {
-        # Variables
-        $supported_keylens = $this->get_supported_keylens(name: $this->name->value);
-
-        # Throw a validation error if this $keylen is not supported for the assigned algo
-        if (!in_array($keylen, $supported_keylens)) {
-            throw new ValidationError(
-                message: "Field `keylen` value `$keylen` is not valid for the `{$this->name->value}` algorithm.",
-                response_id: 'IPSEC_PHASE_2_ENCRYPTION_ALGORITHM_KEYLEN_INVALID_CHOICE',
-            );
-        }
-
-        return $keylen;
     }
 
     /**
@@ -99,6 +79,9 @@ class IPsecPhase2Encryption extends Model {
                 $key_len = $key_len + $key_len_step;
             }
         }
+
+        # Accept '0', as this is the representation keyword for 'auto'
+        $key_lens[] = 0;
 
         return $key_lens;
     }

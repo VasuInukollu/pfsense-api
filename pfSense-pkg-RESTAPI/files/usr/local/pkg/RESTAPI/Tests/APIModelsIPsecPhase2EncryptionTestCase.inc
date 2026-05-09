@@ -3,34 +3,41 @@
 namespace RESTAPI\Tests;
 
 use RESTAPI\Core\TestCase;
+use RESTAPI\Fields\KeyLenField;
 use RESTAPI\Models\IPsecPhase2Encryption;
 
 class APIModelsIPsecPhase2EncryptionTestCase extends TestCase {
     # NOTE: This model is partially tested by /RESTAPI/Tests/APIModelsIPsecPhase2TestCase
 
     /**
-     * Checks that the `keylen` must be valid for the given encryption algorithm `name`.
+     * Checks that the `keylen` field is a KeyLenField instance.
+     */
+    public function test_keylen_field_type(): void {
+        $p2 = new IPsecPhase2Encryption();
+        $this->assert_is_true($p2->keylen instanceof KeyLenField);
+    }
+
+    /**
+     * Checks that the `keylen` field uses `get_supported_keylens` as its choices callable.
+     */
+    public function test_keylen_field_uses_choices_callable(): void {
+        $p2 = new IPsecPhase2Encryption();
+        $this->assert_equals($p2->keylen->choices_callable, 'get_supported_keylens');
+    }
+
+    /**
+     * Checks that the `keylen` field's choices_callable correctly restricts values
+     * to those supported by the selected encryption algorithm.
      */
     public function test_keylen_choices(): void {
-        # Ensure an error is thrown if the requested key length is not supported for the given encryption algorithm
-        $this->assert_throws_response(
-            response_id: 'IPSEC_PHASE_2_ENCRYPTION_ALGORITHM_KEYLEN_INVALID_CHOICE',
-            code: 400,
-            callable: function () {
-                $p2 = new IPsecPhase2Encryption();
-                $p2->name->value = 'aes';
-                $p2->validate_keylen(257);
-            },
-        );
+        # Ensure that `get_supported_keylens` returns only valid key lengths for 'aes'
+        $supported = IPsecPhase2Encryption::get_supported_keylens('aes');
+        $this->assert_is_true(in_array(128, $supported, true));
+        $this->assert_is_true(in_array(256, $supported, true));
+        $this->assert_is_false(in_array(257, $supported, true));
 
-        # Ensure no error is thrown when the key length is supported for the given encryption algorithm
-        $this->assert_does_not_throw(
-            callable: function () {
-                $p2 = new IPsecPhase2Encryption();
-                $p2->name->value = 'aes';
-                $p2->validate_keylen(256);
-            },
-        );
+        # Ensure 0 (auto) is always included in the supported key lengths
+        $this->assert_is_true(in_array(0, $supported, true));
     }
 
     /**
