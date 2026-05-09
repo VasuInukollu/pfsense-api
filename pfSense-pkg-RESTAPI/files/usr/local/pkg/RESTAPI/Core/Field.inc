@@ -27,6 +27,11 @@ class Field {
     const SENSITIVE_MASK = '********';
 
     /**
+     * @const MANY_MAXIMUM is the maximum number of items a 'many' field can hold it's array.
+     */
+    const MANY_MAXIMUM = 65535;
+
+    /**
      * Represents the current value for this Field.
      *
      * @var mixed $value
@@ -144,7 +149,7 @@ class Field {
         public bool $representation_only = false,
         public bool $many = false,
         public int $many_minimum = 0,
-        public int $many_maximum = 128,
+        public int $many_maximum = Field::MANY_MAXIMUM,
         public string|null $delimiter = ',',
         public string $verbose_name = '',
         public string $verbose_name_plural = '',

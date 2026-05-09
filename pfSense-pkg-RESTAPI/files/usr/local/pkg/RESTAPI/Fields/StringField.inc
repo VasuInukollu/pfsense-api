@@ -85,7 +85,7 @@ class StringField extends Field {
         bool $representation_only = false,
         bool $many = false,
         int $many_minimum = 0,
-        int $many_maximum = 128,
+        int $many_maximum = Field::MANY_MAXIMUM,
         public int $minimum_length = 0,
         public int $maximum_length = 1024,
         string|null $delimiter = ',',
