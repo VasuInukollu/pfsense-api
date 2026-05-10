@@ -39,7 +39,7 @@ class APIFieldsKeyLenFieldTestCase extends TestCase {
     public function test_from_internal_empty_string_returns_null(): void {
         $field = new KeyLenField(allow_null: true);
         $field->from_internal('');
-        $this->assert_is_null($field->value);
+        $this->assert_equals($field->value, null);
     }
 
     /**
