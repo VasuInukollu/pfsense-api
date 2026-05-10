@@ -6,6 +6,7 @@ require_once 'RESTAPI/Fields/StringField.inc';
 require_once 'RESTAPI/autoloader.inc';
 
 use RESTAPI;
+use RESTAPI\Core\Field;
 use RESTAPI\Core\Model;
 use RESTAPI\Core\ModelSet;
 use RESTAPI\Models\NetworkInterface;
@@ -97,7 +98,7 @@ class InterfaceField extends StringField {
         bool $editable = true,
         bool $many = false,
         int $many_minimum = 0,
-        int $many_maximum = 128,
+        int $many_maximum = Field::MANY_MAXIMUM,
         string|null $delimiter = ',',
         string $verbose_name = '',
         string $verbose_name_plural = '',

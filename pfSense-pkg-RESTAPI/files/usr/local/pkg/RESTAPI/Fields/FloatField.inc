@@ -5,11 +5,12 @@ namespace RESTAPI\Fields;
 require_once 'RESTAPI/autoloader.inc';
 
 use RESTAPI;
+use RESTAPI\Core\Field;
 
 /**
  * Defines a Field object for validating and storing a floating point number.
  */
-class FloatField extends RESTAPI\Core\Field {
+class FloatField extends Field {
     /**
      * Defines the FloatField object and sets its options.
      * @param bool $required If `true`, this field is required to have a value at all times.
@@ -80,7 +81,7 @@ class FloatField extends RESTAPI\Core\Field {
         bool $representation_only = false,
         bool $many = false,
         int $many_minimum = 0,
-        int $many_maximum = 128,
+        int $many_maximum = Field::MANY_MAXIMUM,
         public int $minimum = 0,
         public int $maximum = PHP_INT_MAX,
         string|null $delimiter = ',',
