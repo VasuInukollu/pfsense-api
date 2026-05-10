@@ -4,7 +4,6 @@ namespace RESTAPI\Models;
 
 use RESTAPI\Core\Model;
 use RESTAPI\Dispatchers\IPsecApplyDispatcher;
-use RESTAPI\Fields\IntegerField;
 use RESTAPI\Fields\KeyLenField;
 use RESTAPI\Fields\StringField;
 use RESTAPI\Responses\ValidationError;
