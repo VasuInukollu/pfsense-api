@@ -50,19 +50,19 @@ class IPsecPhase2Encryption extends Model {
      * @param string $name The encryption algorithm name to obtain key lengths for.
      * @returns array An array of supported key lengths for this encryption algorithm.
      */
-    public static function get_supported_keylens(string $name): array {
+    public function get_supported_keylens(): array {
         global $p2_ealgos;
 
         # Throw an error if an encryption algorithm does not exist with this name.
-        if (!array_key_exists($name, $p2_ealgos)) {
+        if (!array_key_exists($this->name->value, $p2_ealgos)) {
             throw new ValidationError(
-                message: "Could not obtain supported key lengths for unknown algorithm `$name`.",
+                message: "Could not obtain supported key lengths for unknown algorithm `{$this->name->value}`.",
                 response_id: 'IPSEC_PHASE_2_ENCRYPTION_COULD_NOT_GET_KEYLENS_FOR_UNKNOWN_ALGO',
             );
         }
 
         # Obtain the attributes for the encryption algorithm with this $name
-        $p2_ealgo = $p2_ealgos[$name];
+        $p2_ealgo = $p2_ealgos[$this->name->value];
         $key_lens = [];
 
         # Determine available key lengths for this algo when selections are available
