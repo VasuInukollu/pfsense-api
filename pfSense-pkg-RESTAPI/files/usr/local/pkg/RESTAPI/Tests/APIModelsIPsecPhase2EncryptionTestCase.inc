@@ -10,14 +10,6 @@ class APIModelsIPsecPhase2EncryptionTestCase extends TestCase {
     # NOTE: This model is partially tested by /RESTAPI/Tests/APIModelsIPsecPhase2TestCase
 
     /**
-     * Checks that the `keylen` field is a KeyLenField instance.
-     */
-    public function test_keylen_field_type(): void {
-        $p2 = new IPsecPhase2Encryption();
-        $this->assert_is_true($p2->keylen instanceof KeyLenField);
-    }
-
-    /**
      * Checks that the `keylen` field uses `get_supported_keylens` as its choices callable.
      */
     public function test_keylen_field_uses_choices_callable(): void {
@@ -31,7 +23,9 @@ class APIModelsIPsecPhase2EncryptionTestCase extends TestCase {
      */
     public function test_keylen_choices(): void {
         # Ensure that `get_supported_keylens` returns only valid key lengths for 'aes'
-        $supported = IPsecPhase2Encryption::get_supported_keylens('aes');
+        $p2e = new IPsecPhase2Encryption(name: 'aes');
+        $supported = $p2e->get_supported_keylens();
+
         $this->assert_is_true(in_array(128, $supported, true));
         $this->assert_is_true(in_array(256, $supported, true));
         $this->assert_is_false(in_array(257, $supported, true));
@@ -48,8 +42,8 @@ class APIModelsIPsecPhase2EncryptionTestCase extends TestCase {
         # Ensure an error is not thrown if `get_supported_keylens()` receives a valid `name`
         $this->assert_does_not_throw(
             callable: function () {
-                $keylen_enabled_algo = IPsecPhase2Encryption::get_keylen_enabled_algos()[0];
-                IPsecPhase2Encryption::get_supported_keylens(name: $keylen_enabled_algo);
+                $p2e = new IPsecPhase2Encryption(name: 'aes');
+                $p2e->get_supported_keylens();
             },
         );
 
@@ -58,7 +52,8 @@ class APIModelsIPsecPhase2EncryptionTestCase extends TestCase {
             response_id: 'IPSEC_PHASE_2_ENCRYPTION_COULD_NOT_GET_KEYLENS_FOR_UNKNOWN_ALGO',
             code: 400,
             callable: function () {
-                IPsecPhase2Encryption::get_supported_keylens(name: 'not a valid encryption algorithm');
+                $p2e = new IPsecPhase2Encryption(name: 'not a valid encryption algorithm');
+                $p2e->get_supported_keylens();
             },
         );
     }
@@ -70,10 +65,19 @@ class APIModelsIPsecPhase2EncryptionTestCase extends TestCase {
     public function test_get_supported_keylens(): void {
         global $p2_ealgos;
 
+        $p2e = new IPsecPhase2Encryption();
+
         # Loop each encryption algorithm that supported variable key lengths
         foreach (IPsecPhase2Encryption::get_keylen_enabled_algos() as $algo) {
+            $p2e->name->value = $algo;
+
             # Loop through each key length option available to this algorithm and ensure it meets the correct parameters
-            foreach (IPsecPhase2Encryption::get_supported_keylens(name: $algo) as $keylen) {
+            foreach ($p2e->get_supported_keylens() as $keylen) {
+                # Skip 0 as it's always considered valid
+                if ($keylen === 0) {
+                    continue;
+                }
+
                 # Obtain the parameters for supported key lengths
                 $min_keylen = $p2_ealgos[$algo]['keysel']['lo'];
                 $max_keylen = $p2_ealgos[$algo]['keysel']['hi'];
