@@ -915,8 +915,9 @@ class APICoreEndpointTestCase extends TestCase {
         $_SERVER['REMOTE_ADDR'] = '1.2.3.4';
         $_SERVER['REQUEST_METHOD'] = 'POST';
         $_SERVER['HTTP_CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+        $_SERVER['HTTP_ACCEPT'] = 'application/json';
 
-        $unique_name = 'dry_run_alias_' . bin2hex(random_bytes(4));
+        $unique_name = 'dry_run_alias';
 
         # Capture the existing aliases before the dry_run request
         $before_count = count(FirewallAlias::read_all()->model_objects);
@@ -925,6 +926,7 @@ class APICoreEndpointTestCase extends TestCase {
         $_SERVER['QUERY_STRING'] = "name=$unique_name&type=host&dry_run=true";
         $endpoint = new FirewallAliasEndpoint();
         $json_resp = json_decode($endpoint->process_request());
+        var_dump($json_resp);
         $this->assert_equals($json_resp->code, 200);
 
         # Ensure no new alias was actually persisted
