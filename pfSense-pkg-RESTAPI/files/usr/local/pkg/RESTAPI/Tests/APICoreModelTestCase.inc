@@ -261,6 +261,82 @@ class APICoreModelTestCase extends RESTAPI\Core\TestCase {
     }
 
     /**
+     * Checks that validate() throws MODEL_MISSING_REQUIRED_PACKAGE when the -devel variant is installed but
+     * the `allow_development_packages` setting is disabled (default).
+     */
+    public function test_model_validate_packages_devel_not_allowed_by_default(): void {
+        # Ensure the allow_development_packages setting is disabled
+        $settings = new RESTAPI\Models\RESTAPISettings();
+        $settings->from_internal();
+        $original = $settings->allow_development_packages->value;
+
+        if ($original) {
+            $settings->allow_development_packages->value = false;
+            $settings->update(apply: false);
+        }
+
+        # A package that ends with -devel that is not installed should still fail without the setting enabled
+        $this->assert_throws_response(
+            response_id: 'MODEL_MISSING_REQUIRED_PACKAGE',
+            code: 404,
+            callable: function () {
+                $test_model = new Test();
+                $test_model->packages = ['pfSense-pkg-some_package_we_dont_have'];
+                $test_model->validate();
+            },
+        );
+    }
+
+    /**
+     * Checks that when `allow_development_packages` is enabled in RESTAPISettings, a Model whose required package
+     * is not installed but whose -devel counterpart IS installed passes validation. Since we cannot install arbitrary
+     * packages in tests, we verify the inverse: that a package whose -devel name also doesn't exist still fails.
+     */
+    public function test_model_validate_packages_devel_variant_still_fails_when_neither_installed(): void {
+        # Enable the allow_development_packages setting
+        $settings = new RESTAPI\Models\RESTAPISettings();
+        $settings->from_internal();
+        $settings->allow_development_packages->value = true;
+        $settings->update(apply: false);
+
+        # Even with the setting on, if neither the base package nor the -devel variant is installed, it should fail
+        $this->assert_throws_response(
+            response_id: 'MODEL_MISSING_REQUIRED_PACKAGE',
+            code: 404,
+            callable: function () {
+                $test_model = new Test();
+                $test_model->packages = ['pfSense-pkg-some_package_we_dont_have'];
+                $test_model->validate();
+            },
+        );
+
+        # Restore the setting to its original value
+        $settings->allow_development_packages->value = false;
+        $settings->update(apply: false);
+    }
+
+    /**
+     * Checks that when `allow_development_packages` is enabled, a Model whose required package matches an installed
+     * package (using pfSense-pkg-RESTAPI as a proxy for the base package) still passes validation normally.
+     */
+    public function test_model_validate_packages_base_package_still_accepted_when_devel_enabled(): void {
+        # Enable the allow_development_packages setting
+        $settings = new RESTAPI\Models\RESTAPISettings();
+        $settings->from_internal();
+        $settings->allow_development_packages->value = true;
+        $settings->update(apply: false);
+
+        # The base package (pfSense-pkg-RESTAPI) is installed; validation should still pass
+        $test_model = new Test();
+        $test_model->packages = ['pfSense-pkg-RESTAPI'];
+        $test_model->validate();
+
+        # Restore the setting to its original value
+        $settings->allow_development_packages->value = false;
+        $settings->update(apply: false);
+    }
+
+    /**
      * Checks to ensure the validate() method properly throws an error if we cannot include a required package include
      * file because it is not found in the PHP path.
      */

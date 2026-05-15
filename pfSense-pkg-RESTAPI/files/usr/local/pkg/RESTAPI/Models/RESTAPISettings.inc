@@ -33,6 +33,7 @@ class RESTAPISettings extends Model {
     public BooleanField $log_successful_auth;
     public StringField $log_level;
     public BooleanField $allow_pre_releases;
+    public BooleanField $allow_development_packages;
     public BooleanField $hateoas;
     public BooleanField $expose_sensitive_fields;
     public StringField $override_sensitive_fields;
@@ -123,6 +124,14 @@ class RESTAPISettings extends Model {
             and features that are currently under development and may not be fully stable. Use of pre-release versions
             is at your own risk.",
         );
+        $this->allow_development_packages = new BooleanField(
+            default: false,
+            indicates_true: 'enabled',
+            indicates_false: 'disabled',
+            verbose_name: 'allow development packages',
+            help_text: 'Enables or disables using the development (-devel) variant of pfSense packages ' .
+                'required by specific API endpoints.',
+        );
         $this->hateoas = new BooleanField(
             default: false,
             indicates_true: 'enabled',
@@ -145,8 +154,8 @@ class RESTAPISettings extends Model {
             default: [],
             choices_callable: 'get_override_sensitive_fields_choices',
             many: true,
-            conditions: ['expose_sensitive_fields' => false],
             verbose_name: 'Override Sensitive Fields',
+            conditions: ['expose_sensitive_fields' => false],
             help_text: 'Specifies a list of fields (formatted as ModelName:FieldName) that should have their sensitive ' .
                 'attribute overridden. Fields selected here will not be considered sensitive and will be included in ' .
                 'API responses regardless of the `expose_sensitive_fields` setting.',
