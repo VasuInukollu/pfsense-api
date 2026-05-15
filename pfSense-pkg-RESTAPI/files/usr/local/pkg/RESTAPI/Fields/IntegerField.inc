@@ -81,7 +81,7 @@ class IntegerField extends Field {
         bool $representation_only = false,
         bool $many = false,
         int $many_minimum = 0,
-        int $many_maximum = 128,
+        int $many_maximum = Field::MANY_MAXIMUM,
         public int $minimum = 0,
         public int $maximum = PHP_INT_MAX,
         string|null $delimiter = ',',

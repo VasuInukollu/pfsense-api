@@ -85,7 +85,7 @@ class Base64Field extends Field {
         bool $representation_only = false,
         bool $many = false,
         int $many_minimum = 0,
-        int $many_maximum = 128,
+        int $many_maximum = Field::MANY_MAXIMUM,
         string|null $delimiter = ',',
         string $verbose_name = '',
         string $verbose_name_plural = '',

@@ -5,6 +5,7 @@ namespace RESTAPI\Fields;
 require_once 'RESTAPI/autoloader.inc';
 require_once 'RESTAPI/Fields/InterfaceField.inc';
 
+use RESTAPI\Core\Field;
 use RESTAPI\Models\FirewallAlias;
 use RESTAPI\Models\NetworkInterface;
 use RESTAPI\Responses\ServerError;
@@ -103,7 +104,7 @@ class SpecialNetworkField extends InterfaceField {
         bool $representation_only = false,
         bool $many = false,
         int $many_minimum = 0,
-        int $many_maximum = 128,
+        int $many_maximum = Field::MANY_MAXIMUM,
         string|null $delimiter = ',',
         string $verbose_name = '',
         string $verbose_name_plural = '',
