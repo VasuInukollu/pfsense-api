@@ -31,16 +31,16 @@ class IPsecPhase2Encryption extends Model {
         $this->name = new StringField(
             required: true,
             choices: array_keys($p2_ealgos),
-            internal_name: 'name',
             verbose_name: 'Name',
+            internal_name: 'name',
             help_text: 'The name of the encryption algorithm to use for this P2 encryption item.',
         );
         $this->keylen = new KeyLenField(
             required: true,
             choices_callable: 'get_supported_keylens',
+            verbose_name: 'Key Length',
             internal_name: 'keylen',
             conditions: ['name' => $this->get_keylen_enabled_algos()],
-            verbose_name: 'Key Length',
             help_text: 'The key length for the encryption algorithm.',
         );
 
