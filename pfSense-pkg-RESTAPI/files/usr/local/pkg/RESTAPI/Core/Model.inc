@@ -1215,8 +1215,8 @@ class Model {
         }
 
         # Convert properties to object if it's empty. Required for proper JSON conversion.
-        if ($openapi_schema["properties"] === []) {
-            $openapi_schema["properties"] = new stdClass();
+        if ($openapi_schema['properties'] === []) {
+            $openapi_schema['properties'] = new stdClass();
         }
 
         return $openapi_schema;
