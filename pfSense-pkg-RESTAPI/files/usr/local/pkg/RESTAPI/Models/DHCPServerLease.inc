@@ -128,7 +128,7 @@ class DHCPServerLease extends Model {
     /**
      * Clears all existing DHCP server leases
      */
-    public static function delete_all(): ModelSet {
+    public static function delete_all(bool $dry_run = false): ModelSet {
         # Read all existing leases and determine the DHCP server backend
         $leases = self::read_all();
         $dhcp_backend = new DHCPServerBackend();

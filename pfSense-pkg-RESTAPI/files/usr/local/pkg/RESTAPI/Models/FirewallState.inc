@@ -146,7 +146,7 @@ class FirewallState extends Model {
      * Resets the entire state table.
      * @note This action is performed in the background and on a delay to prevent the API from hanging or timing out.
      */
-    public static function delete_all(): ModelSet|Model {
+    public static function delete_all(bool $dry_run = false): ModelSet|Model {
         # Initiate the state table reset in the background
         $dispatcher = new FirewallStateTableResetDispatcher(async: true);
         $dispatcher->spawn_process();
