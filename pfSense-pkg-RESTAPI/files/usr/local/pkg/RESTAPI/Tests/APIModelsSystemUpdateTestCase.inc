@@ -12,9 +12,9 @@ class APIModelsSystemUpdateTestCase extends TestCase {
     public function test_validate_dry_run_field(): void {
         $this->assert_does_not_throw(
             callable: function () {
-                $update = new SystemUpdate(data: ['dry_run' => true]);
-                $update->validate();
-                $this->assert_is_true($update->dry_run->value);
+                $update = new SystemUpdate(dry_run: true);
+                $this->assert_is_true($update->dry_run);
+                $update->create();
             },
         );
     }
