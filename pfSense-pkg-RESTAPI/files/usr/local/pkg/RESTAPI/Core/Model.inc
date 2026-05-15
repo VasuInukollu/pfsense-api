@@ -24,6 +24,7 @@ use RESTAPI\Responses\NotFoundError;
 use RESTAPI\Responses\ServerError;
 use RESTAPI\Responses\ServiceUnavailableError;
 use RESTAPI\Responses\ValidationError;
+use stdClass;
 use function RESTAPI\Core\Tools\get_classes_from_namespace;
 
 # Constants
@@ -1211,6 +1212,11 @@ class Model {
         foreach ($this->get_fields() as $field) {
             # Generate and add the OpenAPI property from the Field object
             $openapi_schema['properties'][$field] = $this->$field->to_openapi_property();
+        }
+
+        # Convert properties to object if it's empty. Required for proper JSON conversion.
+        if ($openapi_schema["properties"] === []) {
+            $openapi_schema["properties"] = new stdClass();
         }
 
         return $openapi_schema;
