@@ -132,9 +132,9 @@ jobs:
             openapi.json
             schema.graphql
 
-  trigger_ansible_collection_build:
+  build_ansible_collection:
     runs-on: ubuntu-latest
-    needs: [release_pkg]
+    needs: [build_schemas]
     steps:
       - name: Generate pfrest-automation GitHub App token
         id: app_token
