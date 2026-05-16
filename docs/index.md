@@ -27,6 +27,14 @@ API package and provide you with the information you need to configure and use t
 New features are constantly being added. If you have a feature request, please open an issue on the project's [GitHub
 repository](https://github.com/pfrest/pfSense-pkg-RESTAPI/issues/new?labels=backlog%2C+feature+request&projects=&template=feature-request.md).
 
+## Integrations
+
+Once you have the REST API package installed and configured, the following tools and integrations are also available to
+help you get the most out of your pfSense systems:
+
+- [pfSense Prometheus Exporter](https://github.com/pfrest/pfsense_exporter): A Prometheus exporter for pfSense metrics, allowing you to monitor your firewall's performance and health in real-time via REST API endpoints. Includes Helm charts and Grafana dashboards.
+- [pfSense Ansible Collection](https://github.com/pfrest/ansible-collection-pfsense): An Ansible collection for managing pfSense firewalls, providing over 400 Ansible modules that utilize the REST API for configuration and management tasks. This collection allows you to automate your pfSense deployments and configurations using Ansible playbooks.
+
 ## Source Code & Contributions
 
 The source code for this project is available in its entirety on [GitHub](https://github.com/pfrest/pfSense-pkg-RESTAPI)
