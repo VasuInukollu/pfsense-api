@@ -23,23 +23,27 @@ class HAProxyEmailMailer extends Model {
         $this->packages = ['pfSense-pkg-haproxy'];
         $this->package_includes = ['haproxy/haproxy.inc', 'haproxy/haproxy_utils.inc'];
         $this->many = true;
+        $this->verbose_name = 'HAProxy Email Mailer';
 
         # Set model fields
         $this->name = new StringField(
             required: true,
             unique: true,
             allow_empty: true,
+            verbose_name: 'Name',
             help_text: 'The descriptive name for this mail server.',
         );
         $this->mailserver = new StringField(
             required: true,
             validators: [new IPAddressValidator(allow_ipv4: true, allow_ipv6: true, allow_fqdn: true)],
+            verbose_name: 'Mail Server',
             help_text: 'The IP or hostname of the mail server.',
         );
         $this->mailserverport = new PortField(
             default: '53',
             allow_alias: false,
             allow_range: false,
+            verbose_name: 'Mail Server Port',
             help_text: 'The port used by this mail server.',
         );
 

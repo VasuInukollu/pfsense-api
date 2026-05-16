@@ -26,29 +26,34 @@ class ACMECertificateIssue extends Model {
             'acme/acme_htmllist.inc',
             'acme/pkg_acme_tabs.inc',
         ];
+        $this->verbose_name = 'ACME Certificate Issuance';
 
         # Define model Fields
         $this->certificate = new ForeignModelField(
             model_name: 'ACMECertificate',
             model_field: 'name',
             required: true,
+            verbose_name: 'Certificate',
             help_text: 'The name of the ACME certificate to be issued.',
         );
         $this->result_log = new StringField(
             default: null,
             allow_null: true,
             read_only: true,
+            verbose_name: 'Result Log',
             help_text: 'The output result of the acme.sh issue command.',
         );
         $this->last_updated = new UnixTimeField(
             default: null,
             allow_null: true,
             read_only: true,
+            verbose_name: 'Last Updated',
             help_text: 'The unix timestamp of when the ACME certificate issue status last changed.',
         );
         $this->status = new StringField(
             default: 'pending',
             read_only: true,
+            verbose_name: 'Status',
             help_text: "The status of the ACME certificate issue process. This will show 'pending' if the issue " .
                 "process is still running or 'completed' if the issue process has finished. This status only " .
                 'indicates whether the issue process has completed, not whether it was successful. You will need' .

@@ -24,6 +24,7 @@ use RESTAPI\Responses\NotFoundError;
 use RESTAPI\Responses\ServerError;
 use RESTAPI\Responses\ServiceUnavailableError;
 use RESTAPI\Responses\ValidationError;
+use stdClass;
 use function RESTAPI\Core\Tools\get_classes_from_namespace;
 
 # Constants
@@ -170,6 +171,16 @@ class Model {
      * support or respect this value. Only Models utilizing Dispatcher objects support $async.
      */
     public bool $async;
+
+    /**
+     * @var bool $dry_run
+     * If set to `true`, the public CRUD methods (`create()`, `update()`, `delete()`, `replace_all()`, `delete_many()`,
+     * `delete_all()`) will perform full validation but skip executing the protected `_create()`, `_update()`, and
+     * `_delete()` methods, skip writing changes to the pfSense configuration, and skip any `apply_*()` work. This
+     * allows clients to validate a payload without persisting any changes. Defaults to `false`. This value has no
+     * effect on read operations.
+     */
+    public bool $dry_run = false;
 
     /**
      * @var Auth $client
@@ -430,6 +441,10 @@ class Model {
         # Obtain the skip_init flag if given. Ensure this defaults to false.
         $this->skip_init = $options['skip_init'] ?? false;
         unset($options['skip_init']);
+
+        # Obtain the dry_run flag if given. Ensure this defaults to false.
+        $this->dry_run = $options['dry_run'] ?? false;
+        unset($options['dry_run']);
 
         return $options;
     }
@@ -918,11 +933,19 @@ class Model {
      * the output of the assigned callable.
      * @param bool $from_all_parents When set to `true`, this method will obtain internal objects from all parent
      * objects in config. This is only applicable to Models with a `parent_model_class` assigned.
+     * @param int $limit Pagination limit for internal callables (0 = no limit).
+     * @param int $offset Pagination offset for internal callables (0 = no offset).
+     * @param bool $reverse Whether to read in reverse order (oldest first) for internal callables.
      * @throws ServerError When neither a `config_path` nor a `internal_callable` are assigned to this model, OR both a
      * `config_path` and a `internal_callable` are assigned to this model
      * @return array The array of internal objects without any additional processing performed.
      */
-    public function get_internal_objects(bool $from_all_parents = false): array {
+    public function get_internal_objects(
+        bool $from_all_parents = false,
+        int $limit = 0,
+        int $offset = 0,
+        bool $reverse = false,
+    ): array {
         global $mock_internal_objects;
 
         # Throw an error if both `config_path` and `internal_callable` are set.
@@ -947,18 +970,57 @@ class Model {
         # Obtain the internal objects by calling the `internal_callable` if specified
         elseif ($this->internal_callable) {
             $callable = $this->internal_callable;
-            $internal_objects = $this->$callable();
+
+            # Forward pagination parameters to callables that accept ALL THREE parameters (limit, offset, reverse).
+            # This allows pagination to be handled by callables that may attempt to load huge amounts of data into
+            # memory. Callables can use these parameters to selectively load data instead of loading everything.
+            $accepts_limit = $this->callable_accepts_param($callable, 'limit');
+            $accepts_offset = $this->callable_accepts_param($callable, 'offset');
+            $accepts_reverse = $this->callable_accepts_param($callable, 'reverse');
+            $needs_pagination = ($limit > 0 or $offset > 0 or $reverse);
+
+            if ($accepts_limit and $accepts_offset and $accepts_reverse and $needs_pagination) {
+                $internal_objects = $this->$callable(limit: $limit, offset: $offset, reverse: $reverse);
+            } else {
+                $internal_objects = $this->$callable();
+            }
         }
         # Otherwise, throw an error. Either a `config_path` or an `internal_callable` is required.
         else {
             throw new ServerError(
-                message: "Model requires a 'config_path' or 'internal_callable' value to be defined before 
+                message: "Model requires a 'config_path' or 'internal_callable' value to be defined before
                     obtaining internal objects.",
                 response_id: 'MODEL_WITH_NO_INTERNAL_METHOD',
             );
         }
 
         return $internal_objects;
+    }
+
+    /**
+     * Checks whether an internal callable method accepts a specific parameter. Results are cached
+     * per class+callable+parameter combination to avoid repeated reflection overhead on paginated requests.
+     * @param string $callable The method name to check.
+     * @param string $param_name The parameter name to check for.
+     * @return bool True if the method has a parameter with the given name.
+     */
+    protected function callable_accepts_param(string $callable, string $param_name): bool {
+        static $cache = [];
+        $key = static::class . '::' . $callable . '::' . $param_name;
+
+        if (!isset($cache[$key])) {
+            $accepts = false;
+            $ref = new \ReflectionMethod($this, $callable);
+            foreach ($ref->getParameters() as $param) {
+                if ($param->getName() === $param_name) {
+                    $accepts = true;
+                    break;
+                }
+            }
+            $cache[$key] = $accepts;
+        }
+
+        return $cache[$key];
     }
 
     /**
@@ -1150,6 +1212,11 @@ class Model {
         foreach ($this->get_fields() as $field) {
             # Generate and add the OpenAPI property from the Field object
             $openapi_schema['properties'][$field] = $this->$field->to_openapi_property();
+        }
+
+        # Convert properties to object if it's empty. Required for proper JSON conversion.
+        if ($openapi_schema['properties'] === []) {
+            $openapi_schema['properties'] = new stdClass();
         }
 
         return $openapi_schema;
@@ -1702,11 +1769,19 @@ class Model {
      * @throws NotFoundError When the Model requires a pfSense package that is not installed.
      * @throws ServerError When a package requires a PHP include file that could not be found.
      */
-    private function check_packages() {
+    private function check_packages(): void {
+        # Check if the user has opted in to using development (-devel) package variants
+        $pkg_config = RESTAPI\Models\RESTAPISettings::get_pkg_config();
+        $allow_development_packages = ($pkg_config['allow_development_packages'] ?? '') === 'enabled';
+
         # Loop through each required package and ensure it is present on the system.
         foreach ($this->packages as $pkg) {
-            # Return an error if the package is not installed
-            if (!is_pkg_installed($pkg)) {
+            # When the pre-release packages setting is enabled, also accept the -devel variant of the package
+            $devel_pkg = $pkg . '-devel';
+            $pkg_installed = is_pkg_installed($pkg) || ($allow_development_packages && is_pkg_installed($devel_pkg));
+
+            # Return an error if neither the package nor its -devel variant (when allowed) is installed
+            if (!$pkg_installed) {
                 throw new NotFoundError(
                     message: "The requested action requires the '$pkg' package but it is not installed.",
                     response_id: 'MODEL_MISSING_REQUIRED_PACKAGE',
@@ -1954,11 +2029,11 @@ class Model {
         $model_name = self::get_class_fqn();
         $model = new $model_name();
         $model_objects = [];
-        $requests_pagination = ($limit or $offset);
-        $cache_exempt = ($requests_pagination or $reverse or $model->model_cache_exempt);
+        $requests_pagination = ($limit or $offset or $reverse);
+        $cache_exempt = ($requests_pagination or $model->model_cache_exempt);
 
         # Throw an error if pagination was requested on a Model without $many enabled
-        if (!$model->many and $requests_pagination) {
+        if (!$model->many and ($limit or $offset)) {
             throw new ValidationError(
                 message: "Model `$model->verbose_name` does not support pagination. Please remove the `limit` and/or. " .
                     '`offset`parameters and try again.',
@@ -1971,15 +2046,41 @@ class Model {
             return Model::get_model_cache()::fetch_modelset($model_name);
         }
 
-        # Obtain all of this Model's internally stored objects, including those from parent Models if applicable
-        $internal_objects = $model->get_internal_objects(from_all_parents: true);
+        # Check if the callable supports native pagination (all three parameters: limit, offset, reverse)
+        $callable_handled_pagination = false;
+        if ($model->internal_callable && $requests_pagination) {
+            $callable = $model->internal_callable;
+            $callable_handles_all =
+                $model->callable_accepts_param($callable, 'limit') &&
+                $model->callable_accepts_param($callable, 'offset') &&
+                $model->callable_accepts_param($callable, 'reverse');
+
+            if ($callable_handles_all) {
+                $callable_handled_pagination = true;
+            }
+        }
+
+        # Obtain all internal objects, passing pagination params for callables that support them
+        $internal_objects = $model->get_internal_objects(
+            from_all_parents: true,
+            limit: $limit,
+            offset: $offset,
+            reverse: $reverse,
+        );
 
         # For non `many` Models, wrap the internal object in an array so we can loop
         $internal_objects = $model->many ? $internal_objects : [$internal_objects];
 
-        # Reverse the order we read the objects and/or paginate if requested
-        $internal_objects = $reverse ? array_reverse($internal_objects, preserve_keys: true) : $internal_objects;
-        $internal_objects = self::paginate($internal_objects, $limit, $offset, preserve_keys: true);
+        # Apply pagination and/or reverse if the callable did not handle it natively
+        if (!$callable_handled_pagination && $requests_pagination) {
+            if ($reverse) {
+                # Paginate from the beginning (oldest entries), then reverse for display
+                $internal_objects = array_reverse($internal_objects, preserve_keys: true);
+                $internal_objects = self::paginate($internal_objects, $limit, $offset, preserve_keys: true);
+            } else {
+                $internal_objects = self::paginate($internal_objects, $limit, $offset, preserve_keys: true);
+            }
+        }
 
         # Loop through each internal object and create a Model object for it
         foreach ($internal_objects as $internal_id => $internal_object) {
@@ -1990,8 +2091,12 @@ class Model {
             $parent_id = $parent_model ? $parent_model->id : null;
             $internal_object = $parent_model ? $internal_object['_internal_object'] : $internal_object;
 
-            # Normalize IDs
+            # Normalize IDs - when the callable handled pagination natively, the array indices start
+            # at 0 but the actual IDs should account for the offset
             $internal_id = is_numeric($internal_id) ? (int) $internal_id : $internal_id;
+            if ($callable_handled_pagination && is_int($internal_id)) {
+                $internal_id += $offset;
+            }
 
             # Create a new Model object for this internal object and assign its ID
             $model_object = new $model(id: $internal_id, parent_id: $parent_id, skip_init: true);
@@ -2150,6 +2255,12 @@ class Model {
             # Check if creating this object would put the total number of objects over the $many_maximum
             $this->check_many_maximum();
 
+            # When dry_run is enabled, skip the actual write/apply phase but still report the would-be result
+            if ($this->dry_run) {
+                self::clear_model_cache();
+                return $this;
+            }
+
             # Run the _create method
             $this->_create();
 
@@ -2243,6 +2354,12 @@ class Model {
 
         # Ensure all object Fields and validations succeed for proceeding.
         if ($this->validate(requires_id: true)) {
+            # When dry_run is enabled, skip the actual write/apply phase but still report the would-be result
+            if ($this->dry_run) {
+                self::clear_model_cache();
+                return $this;
+            }
+
             # Run the _update method
             $this->_update();
 
@@ -2323,6 +2440,23 @@ class Model {
         $new_objects = new ModelSet();
         if ($this->protected_model_query) {
             $new_objects = $initial_objects->query(query_params: $this->protected_model_query);
+        }
+
+        # When dry_run is enabled, validate each requested object against the existing protected ModelSet but
+        # do not mutate or persist the configuration. This still allows clients to detect duplicate or invalid
+        # entries before applying the replacement.
+        if ($this->dry_run) {
+            foreach ($data as $representation_object) {
+                unset($representation_object['id']);
+                $model_object = new $this(data: $representation_object, skip_init: true, client: $this->client);
+                # Assign a synthetic ID for uniqueness comparisons during validation
+                $model_object->id = count($new_objects->model_objects);
+                $model_object->validate(modelset: $new_objects);
+                $new_objects->model_objects[] = $model_object;
+            }
+
+            self::clear_model_cache();
+            return $new_objects;
         }
 
         # Before beginning validation, empty the stored values in the config path. Retain protected Models (if any).
@@ -2427,6 +2561,12 @@ class Model {
             # Block the deletion if will put us below the minimum number of objects required for this Model
             $this->check_many_minimum();
 
+            # When dry_run is enabled, skip the actual delete/apply phase but still report the would-be result
+            if ($this->dry_run) {
+                self::clear_model_cache();
+                return $this;
+            }
+
             # Run the _delete method
             $this->_delete();
 
@@ -2466,6 +2606,8 @@ class Model {
      *  enabled Models.
      * @param int $limit The maximum number of Model objects to retrieve. This is only applicable to $many
      *  enabled Models.
+     * @param bool $dry_run When `true`, propagate the dry_run flag to each matched Model object so the underlying
+     *  delete() is validated but not actually performed.
      * @param mixed ...$vl_query_params Qyery parameters that are passed in using variable-length arguments
      *  https://www.php.net/manual/en/functions.arguments.php#functions.variable-arg-list
      * @return ModelSet The queried ModelSet containing only Model objects that matched the query.
@@ -2475,6 +2617,7 @@ class Model {
         array $excluded = [],
         int $limit = 0,
         int $offset = 0,
+        bool $dry_run = false,
         ...$vl_query_params,
     ): ModelSet {
         # Merge the $query_params and any provided variable-length arguments into a single variable
@@ -2491,6 +2634,11 @@ class Model {
         # Obtain all Model objects that match the query of objects to be deleted
         $model_objects = self::query(query_params: $query_params, excluded: $excluded, limit: $limit, offset: $offset);
 
+        # Propagate the dry_run flag to each matched Model object so the underlying delete() honors it
+        foreach ($model_objects->model_objects as $model_object) {
+            $model_object->dry_run = $dry_run;
+        }
+
         # Reset the object cache as the config has changed
         self::clear_model_cache();
 
@@ -2500,10 +2648,17 @@ class Model {
 
     /**
      * Deletes all Model objects for this Model. This method is only available for $many Models without a $parent_model_class.
+     * @param bool $dry_run When `true`, propagate the dry_run flag to each Model object so the underlying delete()
+     * is validated but not actually performed.
      */
-    public static function delete_all(): ModelSet|Model {
+    public static function delete_all(bool $dry_run = false): ModelSet|Model {
         # Obtain all Model objects for this Model
         $model_objects = self::read_all();
+
+        # Propagate the dry_run flag to each Model object so the underlying delete() honors it
+        foreach ($model_objects->model_objects as $model_object) {
+            $model_object->dry_run = $dry_run;
+        }
 
         # Reset the object cache as the config has changed
         self::clear_model_cache();

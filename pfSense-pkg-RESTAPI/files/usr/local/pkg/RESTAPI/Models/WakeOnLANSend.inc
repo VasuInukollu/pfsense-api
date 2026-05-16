@@ -21,15 +21,18 @@ class WakeOnLANSend extends Model {
         # Set model attributes
         $this->many = false;
         $this->internal_callable = 'void_internal_callable';
+        $this->verbose_name = 'Wake-on-LAN Packet';
 
         # Set model fields
         $this->interface = new InterfaceField(
             required: true,
+            verbose_name: 'Interface',
             help_text: 'The interface the host to be woken up is connected to.',
         );
         $this->mac_addr = new StringField(
             required: true,
             validators: [new MACAddressValidator()],
+            verbose_name: 'MAC Addr',
             help_text: 'The MAC address of the host to be awoken.',
         );
         parent::__construct($id, $parent_id, $data, ...$options);

@@ -41,7 +41,7 @@ class UIDField extends Field {
      * @param string $help_text Set a description for this field. This description will be used in API documentation.
      */
     public function __construct(
-        string $prefix = '',
+        public string $prefix = '',
         bool $sensitive = false,
         bool $representation_only = false,
         string $verbose_name = '',
@@ -56,7 +56,7 @@ class UIDField extends Field {
         parent::__construct(
             type: 'string',
             unique: true,
-            default: uniqid(prefix: $prefix),
+            default_callable: 'generate_uid',
             editable: false,
             read_only: true,
             sensitive: $sensitive,
@@ -70,6 +70,10 @@ class UIDField extends Field {
             validators: $validators,
             help_text: $help_text,
         );
+    }
+
+    public function generate_uid(): string {
+        return uniqid(prefix: $this->prefix);
     }
 
     /**

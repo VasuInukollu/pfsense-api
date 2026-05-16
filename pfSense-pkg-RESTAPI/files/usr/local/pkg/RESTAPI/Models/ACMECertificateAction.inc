@@ -23,17 +23,24 @@ class ACMECertificateAction extends Model {
             'acme/acme_htmllist.inc',
             'acme/pkg_acme_tabs.inc',
         ];
+        $this->verbose_name = 'ACME Certificate Action';
 
         # Define model Fields
         $this->status = new StringField(
             default: 'active',
             choices: ['active', 'disabled'],
+            verbose_name: 'Status',
             help_text: 'The activation status of the ACME certificate.',
         );
-        $this->command = new StringField(required: true, help_text: 'The command to execute on the ACME certificate.');
+        $this->command = new StringField(
+            required: true,
+            verbose_name: 'Command',
+            help_text: 'The command to execute on the ACME certificate.',
+        );
         $this->method = new StringField(
             required: true,
             choices: ['shellcommand', 'php_command', 'servicerestart', 'xmlrpcservicerestart'],
+            verbose_name: 'Method',
             help_text: 'The action method that should be used to run the command.',
         );
 

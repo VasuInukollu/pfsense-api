@@ -361,6 +361,19 @@ class Endpoint {
     public bool $remove = false;
 
     /**
+     * @var bool $dry_run
+     * Sets the default value for the `dry_run` field in the request data. When `true`, write request methods
+     * (POST, PUT, PATCH, DELETE) will fully validate the requested change but skip running the protected
+     * `_create()`, `_update()`, and `_delete()` Model methods, skip writing to the pfSense configuration, and
+     * skip any apply work. This allows clients to validate a payload before actually applying it. This value
+     * may be overridden by the client via the `dry_run` field in the request data, or — for any request method —
+     * via a `Prefer: dry-run` HTTP header (useful for PUT requests to `many` endpoints whose body must be an
+     * indexed array). This parameter has no effect on GET requests; supplying it on a GET request results in a
+     * ValidationError.
+     */
+    public bool $dry_run = false;
+
+    /**
      * Sets values whenever the Endpoint object is crated.
      */
     public function __construct() {
@@ -1001,6 +1014,48 @@ class Endpoint {
     }
 
     /**
+     * Validates the $dry_run common control parameter for this request.
+     * @note If the `dry_run` field was not provided in the request data, the request will check for a `Prefer: dry-run`
+     * HTTP header. If neither is provided, the request will default to the Endpoint's assigned $dry_run property value.
+     * @throws ValidationError When the `dry_run` field is not a boolean, or when it is set on a GET request.
+     */
+    private function validate_dry_run(): void {
+        # Detect dry-run requested via the HTTP Prefer header (RFC 7240 style token list)
+        $prefer_header = $_SERVER['HTTP_PREFER'] ?? '';
+        $prefer_tokens = array_map('trim', explode(',', strtolower($prefer_header)));
+        $prefer_dry_run = in_array('dry-run', $prefer_tokens, strict: true);
+
+        # Only validate the request body field if the client specifically requested it
+        if (isset($this->request_data['dry_run'])) {
+            # Ensure value is a bool
+            if (!is_bool($this->request_data['dry_run'])) {
+                throw new ValidationError(
+                    message: 'Field `dry_run` must be of type `boolean`.',
+                    response_id: 'ENDPOINT_DRY_RUN_FIELD_INVALID_TYPE',
+                );
+            }
+
+            # Update the dry_run property to use the client's requested value and remove it from the request data
+            $this->dry_run = $this->request_data['dry_run'];
+            unset($this->request_data['dry_run']);
+        }
+
+        # Allow the Prefer header to enable (but not disable) dry_run; this is the canonical way to request dry_run
+        # for PUT requests to `many` endpoints whose body must be an indexed array of objects.
+        if ($prefer_dry_run) {
+            $this->dry_run = true;
+        }
+
+        # Reject dry_run on GET requests since there is nothing to skip on a read operation
+        if ($this->dry_run and $this->request_method === 'GET') {
+            throw new ValidationError(
+                message: 'The `dry_run` parameter is not supported on GET requests.',
+                response_id: 'ENDPOINT_DRY_RUN_NOT_SUPPORTED_ON_GET',
+            );
+        }
+    }
+
+    /**
      * Performs validation on non-Model fields. These fields control how Models are initially obtained/constructed.
      * @throws ValidationError When one or more Endpoint releated fields fail validation.
      */
@@ -1023,6 +1078,7 @@ class Endpoint {
         $this->validate_remove();
         $this->validate_limit();
         $this->validate_offset();
+        $this->validate_dry_run();
     }
 
     /**
@@ -1065,6 +1121,7 @@ class Endpoint {
             # Assign the authenticated client object context to the Model
             $this->model->client = $this->client;
             $this->model->async = $this->async;
+            $this->model->dry_run = $this->dry_run;
 
             # Perform the appropriate action based on the request method
             switch ($this->request_method) {
@@ -1206,7 +1263,7 @@ class Endpoint {
             # Run the delete_all method if the request data contains the 'all' parameter
             if (isset($this->request_data['all']) and $this->request_data['all'] === true) {
                 $this->get_pagination_resource_links(limit: 0, offset: 0);
-                return $this->model->delete_all();
+                return $this->model->delete_all(dry_run: $this->dry_run);
             }
 
             $this->get_pagination_resource_links(limit: $this->limit, offset: $this->offset);
@@ -1214,6 +1271,7 @@ class Endpoint {
                 query_params: $this->request_data,
                 limit: $this->limit,
                 offset: $this->offset,
+                dry_run: $this->dry_run,
             );
         }
 

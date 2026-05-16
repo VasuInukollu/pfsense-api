@@ -23,16 +23,19 @@ class BINDAccessListEntry extends Model {
         $this->always_apply = true;
         $this->many = true;
         $this->many_minimum = 1;
+        $this->verbose_name = 'BIND Access List Entry';
 
         # Set model fields
         $this->value = new StringField(
             required: true,
             validators: [new SubnetValidator()],
+            verbose_name: 'Value',
             help_text: 'The network CIDR to allow.',
         );
         $this->description = new StringField(
             default: '',
             allow_empty: true,
+            verbose_name: 'Description',
             help_text: 'A description of the access list entry.',
         );
 

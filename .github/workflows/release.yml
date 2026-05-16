@@ -10,7 +10,7 @@ concurrency: build
 env:
   SWAGGER_UI_VERSION: "5.17.10"
   PYTHON_VERSION: "3.10"
-  DEFAULT_PFSENSE_VERSION: "2.8.0"
+  DEFAULT_PFSENSE_VERSION: "2.8.1"
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -27,17 +27,7 @@ jobs:
         include:
           # Note: The first item in this matrix must use env.DEFAULT_PFSENSE_VERSION as the PFSENSE_VERSION!
           - FREEBSD_VERSION: FreeBSD-15.0-CURRENT
-            PFSENSE_VERSION: "2.8.0"
-          - FREEBSD_VERSION: FreeBSD-15.0-CURRENT
             PFSENSE_VERSION: "2.8.1"
-          - FREEBSD_VERSION: FreeBSD-15.0-CURRENT
-            PFSENSE_VERSION: "24.11"
-          - FREEBSD_VERSION: FreeBSD-15.0-CURRENT
-            PFSENSE_VERSION: "25.07"
-          - FREEBSD_VERSION: FreeBSD-15.0-CURRENT
-            PFSENSE_VERSION: "25.07.1"
-          - FREEBSD_VERSION: FreeBSD-16.0-CURRENT
-            PFSENSE_VERSION: "25.11"
           - FREEBSD_VERSION: FreeBSD-16.0-CURRENT
             PFSENSE_VERSION: "25.11.1"
           - FREEBSD_VERSION: FreeBSD-16.0-CURRENT
@@ -106,6 +96,7 @@ jobs:
 
       - name: Fetch schemas from pfSense
         run: |
+          curl -s -k -u admin:pfsense -X GET https://pfSense-${{ env.DEFAULT_PFSENSE_VERSION }}-RELEASE.actions.pfrest.org/api/v2/schema/native > native.json
           curl -s -k -u admin:pfsense -X GET https://pfSense-${{ env.DEFAULT_PFSENSE_VERSION }}-RELEASE.actions.pfrest.org/api/v2/schema/openapi > openapi.json
           curl -s -k -u admin:pfsense -X GET https://pfSense-${{ env.DEFAULT_PFSENSE_VERSION }}-RELEASE.actions.pfrest.org/api/v2/schema/graphql > schema.graphql
 
@@ -114,6 +105,12 @@ jobs:
         run: |
           /usr/local/bin/VBoxManage controlvm pfSense-${{ env.DEFAULT_PFSENSE_VERSION }}-RELEASE poweroff || true
           /usr/local/bin/VBoxManage snapshot pfSense-${{ env.DEFAULT_PFSENSE_VERSION }}-RELEASE restore initial
+
+      - name: Upload Native schema
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native.json
+          path: native.json
 
       - name: Upload OpenAPI schema
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -126,6 +123,36 @@ jobs:
         with:
           name: schema.graphql
           path: schema.graphql
+
+      - name: Release schemas
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          files: |
+            native.json
+            openapi.json
+            schema.graphql
+
+  build_ansible_collection:
+    runs-on: ubuntu-latest
+    needs: [build_schemas]
+    steps:
+      - name: Generate pfrest-automation GitHub App token
+        id: app_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.PFREST_AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.PFREST_AUTOMATION_PRIVATE_KEY }}
+          owner: pfrest
+          repositories: ansible-collection-pfsense
+
+      - name: Trigger ansible-collection-pfrest generate workflow
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ steps.app_token.outputs.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/pfrest/ansible-collection-pfsense/dispatches \
+            -d '{"event_type":"pfSense-pkg-RESTAPI-release"}'
 
   release_docs:
     needs: [build_schemas]

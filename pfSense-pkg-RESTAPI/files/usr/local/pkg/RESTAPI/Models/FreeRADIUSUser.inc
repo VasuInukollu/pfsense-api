@@ -8,14 +8,15 @@ use RESTAPI\Core\Model;
 use RESTAPI\Fields\BooleanField;
 use RESTAPI\Fields\IntegerField;
 use RESTAPI\Fields\StringField;
+use RESTAPI\ModelTraits\FreeRADIUSCommonModelTraits;
 use RESTAPI\Responses\ValidationError;
-use RESTAPI\Validators\RegexValidator;
-use RESTAPI\Validators\IPAddressValidator;
 
 /**
- * Defines a Model that represents FreeRADIUS Users
+ * Defines a Model that represents FreeRADIUS Users.
  */
 class FreeRADIUSUser extends Model {
+    use FreeRADIUSCommonModelTraits;
+
     public StringField $username;
     public StringField $password;
     public StringField $password_encryption;
@@ -24,7 +25,6 @@ class FreeRADIUSUser extends Model {
     public StringField $motp_secret;
     public StringField $motp_pin;
     public IntegerField $motp_offset;
-    public StringField $description;
 
     public function __construct(mixed $id = null, mixed $parent_id = null, mixed $data = [], mixed ...$options) {
         # Set model attributes
@@ -33,11 +33,13 @@ class FreeRADIUSUser extends Model {
         $this->config_path = 'installedpackages/freeradius/config';
         $this->many = true;
         $this->always_apply = true;
+        $this->verbose_name = 'FreeRADIUS User';
 
-        # Set model fields
+        # Set the user-specific Fields
         $this->username = new StringField(
             required: true,
             unique: true,
+            verbose_name: 'Username',
             internal_name: 'varusersusername',
             help_text: 'The username for this user.',
         );
@@ -46,6 +48,7 @@ class FreeRADIUSUser extends Model {
             allow_empty: false,
             allow_null: false,
             sensitive: true,
+            verbose_name: 'Password',
             internal_name: 'varuserspassword',
             conditions: ['motp_enable' => false],
             help_text: 'The password for this username.',
@@ -54,6 +57,7 @@ class FreeRADIUSUser extends Model {
             required: false,
             default: 'Cleartext-Password',
             choices: ['Cleartext-Password', 'MD5-Password', 'MD5-Password-hashed', 'NT-Password-hashed'],
+            verbose_name: 'Password Encryption',
             internal_name: 'varuserspasswordencryption',
             conditions: ['motp_enable' => false],
             help_text: 'The encryption method for the password.',
@@ -63,6 +67,7 @@ class FreeRADIUSUser extends Model {
             default: false,
             indicates_true: 'on',
             indicates_false: '',
+            verbose_name: 'MOTP Enable',
             internal_name: 'varusersmotpenable',
             help_text: 'Enable or disable the use of Mobile One-Time Password (MOTP) for this user.',
         );
@@ -70,6 +75,7 @@ class FreeRADIUSUser extends Model {
             required: false,
             default: 'googleauth',
             choices: ['motp', 'googleauth'],
+            verbose_name: 'MOTP Auth Method',
             internal_name: 'varusersauthmethod',
             conditions: ['motp_enable' => true],
             help_text: 'The authentication method for the Mobile One-Time Password (MOTP).',
@@ -78,6 +84,7 @@ class FreeRADIUSUser extends Model {
             required: true,
             allow_null: false,
             sensitive: true,
+            verbose_name: 'MOTP Secret',
             internal_name: 'varusersmotpinitsecret',
             conditions: ['motp_enable' => true],
             help_text: 'The secret for the Mobile One-Time Password (MOTP).',
@@ -88,6 +95,7 @@ class FreeRADIUSUser extends Model {
             sensitive: true,
             minimum_length: 4,
             maximum_length: 4,
+            verbose_name: 'MOTP PIN',
             internal_name: 'varusersmotppin',
             conditions: ['motp_enable' => true],
             help_text: 'The PIN for the Mobile One-Time Password (MOTP). It must be exactly 4 digits.',
@@ -96,40 +104,14 @@ class FreeRADIUSUser extends Model {
             required: false,
             default: 0,
             allow_null: false,
+            verbose_name: 'MOTP Offset',
             internal_name: 'varusersmotpoffset',
             conditions: ['motp_enable' => true],
             help_text: 'The timezone offset for this user.',
         );
-        $this->description = new StringField(
-            required: false,
-            default: '',
-            allow_empty: true,
-            validators: [
-                new RegexValidator(
-                    pattern: "/^[a-zA-Z0-9 _,.;:+=()-]*$/",
-                    error_msg: 'Value contains invalid characters.',
-                ),
-            ],
-            help_text: 'A description for this user.',
-        );
-        $this->framed_ip_address = new StringField(
-            required: false,
-            default: '',
-            internal_name: 'varusersframedipaddress',
-            allow_empty: true,
-            validators: [new IPAddressValidator(allow_ipv4: true, allow_ipv6: false)],
-            help_text: 'Framed-IP-Address MUST be supported by NAS. ' .
-                'If the OpenVPN server uses a subnet style Topology the RADIUS server MUST ' .
-                'also send back an appropriate Framed-IP-Netmask value matching the VPN Tunnel Network.',
-        );
-        $this->framed_ip_netmask = new StringField(
-            required: false,
-            default: '',
-            internal_name: 'varusersframedipnetmask',
-            allow_empty: true,
-            validators: [new IPAddressValidator(allow_ipv4: true, allow_ipv6: false)],
-            help_text: 'Framed-IP-Netmask MUST be supported by NAS',
-        );
+
+        # Define the Fields shared with FreeRADIUSMAC via the FreeRADIUSCommonModelTraits trait.
+        $this->init_freeradius_common_fields(prefix: 'varusers');
 
         parent::__construct($id, $parent_id, $data, ...$options);
     }

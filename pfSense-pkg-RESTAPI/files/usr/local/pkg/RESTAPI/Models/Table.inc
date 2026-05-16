@@ -19,7 +19,13 @@ class Table extends Model {
         $this->id_type = 'string';
         $this->many = true;
 
-        $this->entries = new StringField(many: true, delimiter: ' ', help_text: 'The entries currently in the table.');
+        $this->name = new StringField(required: true, verbose_name: 'Name', help_text: 'The name of the table');
+        $this->entries = new StringField(
+            many: true,
+            delimiter: ' ',
+            verbose_name: 'Entries',
+            help_text: 'The entries currently in the table.',
+        );
 
         parent::__construct($id, $parent_id, $data, ...$options);
     }
@@ -47,7 +53,7 @@ class Table extends Model {
                 '/sbin/pfctl -t ' . escapeshellarg($table_name) . ' -T show',
                 trim_whitespace: true,
             );
-            $tables[$table_name] = ['entries' => trim($table_entries_output->output)];
+            $tables[$table_name] = ['name' => $table_name, 'entries' => trim($table_entries_output->output)];
         }
 
         return $tables;

@@ -18,12 +18,14 @@ class WireGuardApply extends Model {
         # Set model attributes
         $this->internal_callable = 'get_applied_status';
         $this->always_apply = true;
+        $this->verbose_name = 'WireGuard Apply';
 
         # Set model Fields
         $this->applied = new BooleanField(
             read_only: true,
             indicates_true: true,
             indicates_false: false,
+            verbose_name: 'Applied',
             help_text: 'Displays `true` when all WireGuard changes are applied and there are no pending changes left.' .
                 'Displays `false` when there are pending WireGuard changes that have not been applied.',
         );

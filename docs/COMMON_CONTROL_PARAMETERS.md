@@ -58,6 +58,25 @@ all endpoints and requests, but some endpoints may not support all parameters.
     this may result in your API request receiving a timeout. It is recommended to use this parameter with caution and
     only when necessary.
 
+## dry_run
+
+- Type: Boolean
+- Default: `false`
+- Description: This parameter allows clients to validate a request payload without actually applying any changes. When
+  set to `true`, the API will run the full validation pipeline for the targeted Model (including field-level
+  validators, cross-field validation, uniqueness checks, and reference checks) but will skip writing to the pfSense
+  configuration and skip any apply work (such as filter reloads or service restarts). This is useful for "preflight"
+  checks before submitting an actual change.
+
+!!! Notes
+    - This parameter is only available for `POST`, `PATCH`, `PUT`, and `DELETE` requests. Setting it on a `GET`
+      request results in a `ValidationError`.
+    - For `PUT` requests to `many` endpoints (whose body must be an indexed array of objects), the request body
+      cannot carry a `dry_run` field. In that case, set the `Prefer: dry-run` HTTP header instead. The `Prefer`
+      header is honored for any request method.
+    - When `dry_run` is `true`, the response will reflect the would-be result of the operation but no changes will
+      be persisted to the pfSense configuration.
+
 ## placement
 
 - Type: Integer

@@ -23,21 +23,25 @@ class BINDSyncSettings extends Model {
         $this->package_includes = ['bind.inc'];
         $this->many = false;
         $this->always_apply = true;
+        $this->verbose_name = 'BIND Sync Settings';
 
         # Set model fields
         $this->synconchanges = new StringField(
             required: true,
             choices: ['disabled', 'manual', 'auto'],
+            verbose_name: 'Sync on Changes',
             help_text: 'The sync mode to use.',
         );
         $this->synctimeout = new IntegerField(
             default: 30,
             choices: [30, 60, 90, 120, 150, 250],
+            verbose_name: 'Sync Timeout',
             help_text: 'The timeout for the sync process.',
         );
         $this->masterip = new StringField(
             required: true,
             validators: [new IPAddressValidator(allow_fqdn: true)],
+            verbose_name: 'Master IP',
             help_text: 'The IP address of the master BIND server.',
         );
 

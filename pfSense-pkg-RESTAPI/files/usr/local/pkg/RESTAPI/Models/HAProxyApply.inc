@@ -19,12 +19,14 @@ class HAProxyApply extends Model {
         $this->many = false;
         $this->packages = ['pfSense-pkg-haproxy'];
         $this->package_includes = ['haproxy/haproxy.inc', 'haproxy/haproxy_utils.inc'];
+        $this->verbose_name = 'HAProxy Apply';
 
         # Set model fields
         $this->applied = new BooleanField(
             read_only: true,
             indicates_true: true,
             indicates_false: false,
+            verbose_name: 'Applied',
             help_text: 'Indicates whether all HAProxy configuration changes have been applied.',
         );
 

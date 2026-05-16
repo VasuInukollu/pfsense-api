@@ -22,21 +22,28 @@ class HAProxyFile extends Model {
         $this->packages = ['pfSense-pkg-haproxy'];
         $this->package_includes = ['haproxy/haproxy.inc', 'haproxy/haproxy_utils.inc'];
         $this->many = true;
+        $this->verbose_name = 'HAProxy File';
 
         # Set model fields
         $this->name = new StringField(
             required: true,
             unique: true,
             validators: [new RegexValidator(pattern: "/^[a-zA-Z][a-zA-Z0-9\.\-_]*$/")],
+            verbose_name: 'Name',
             help_text: 'The unique name for this file.',
         );
         $this->type = new StringField(
             default: null,
             choices: ['luascript', 'writetodisk'],
             allow_null: true,
+            verbose_name: 'Type',
             help_text: 'The type of file. Use `null` to assume an Errorfile.',
         );
-        $this->content = new Base64Field(required: true, help_text: 'The content of this file.');
+        $this->content = new Base64Field(
+            required: true,
+            verbose_name: 'Content',
+            help_text: 'The content of this file.',
+        );
 
         parent::__construct($id, $parent_id, $data, ...$options);
     }

@@ -25,16 +25,19 @@ class HAProxyFrontendAddress extends Model {
         $this->packages = ['pfSense-pkg-haproxy'];
         $this->package_includes = ['haproxy/haproxy.inc', 'haproxy/haproxy_utils.inc'];
         $this->many = true;
+        $this->verbose_name = 'HAProxy Frontend Address';
 
         # Set model fields
         $this->extaddr = new StringField(
             required: true,
             choices: ['custom', 'any_ipv4', 'any_ipv6', 'localhost_ipv4', 'localhost_ipv6'],
+            verbose_name: 'External Address',
             help_text: 'The external address to use.',
         );
         $this->extaddr_custom = new StringField(
             required: true,
             conditions: ['extaddr' => 'custom'],
+            verbose_name: 'Custom External Address',
             help_text: 'The custom IPv4 or IPv6 address to use as the external address.',
         );
         $this->extaddr_port = new PortField(
@@ -42,17 +45,20 @@ class HAProxyFrontendAddress extends Model {
             allow_alias: false,
             allow_range: false,
             allow_null: true,
+            verbose_name: 'External Address Port',
             help_text: 'The port to bind to for this address.',
         );
         $this->extaddr_ssl = new BooleanField(
             default: false,
             indicates_true: 'yes',
             indicates_false: '',
+            verbose_name: 'External Address SSL',
             help_text: 'Enables or disables using SSL/TLS for this address.',
         );
         $this->exaddr_advanced = new StringField(
             default: '',
             allow_empty: true,
+            verbose_name: 'Advanced External Address',
             help_text: 'The advanced configuration to apply to this address.',
         );
 

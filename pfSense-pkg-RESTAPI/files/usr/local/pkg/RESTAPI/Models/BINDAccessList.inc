@@ -22,17 +22,25 @@ class BINDAccessList extends Model {
         $this->package_includes = ['bind.inc'];
         $this->many = true;
         $this->always_apply = true;
+        $this->verbose_name = 'BIND Access List';
 
         # Set model fields
-        $this->name = new StringField(required: true, unique: true, help_text: 'The name of the access list.');
+        $this->name = new StringField(
+            required: true,
+            unique: true,
+            verbose_name: 'Name',
+            help_text: 'The name of the access list.',
+        );
         $this->description = new StringField(
             default: '',
             allow_empty: true,
+            verbose_name: 'Description',
             help_text: 'A description for the access list.',
         );
         $this->entries = new NestedModelField(
             model_class: 'BINDAccessListEntry',
             required: true,
+            verbose_name: 'Entries',
             help_text: 'The network entries for this access list.',
         );
 

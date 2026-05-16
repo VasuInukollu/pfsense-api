@@ -870,4 +870,91 @@ class APICoreEndpointTestCase extends TestCase {
         $this->assert_equals($resp->data[2]->name, 'alias_a');
         $this->assert_equals($resp->data[3]->name, 'alias_c');
     }
+
+    /**
+     * Ensures the `dry_run` common control parameter is rejected when its type is wrong.
+     */
+    public function test_dry_run_invalid_type(): void {
+        $_SERVER['PHP_AUTH_USER'] = 'admin';
+        $_SERVER['PHP_AUTH_PW'] = 'pfsense';
+        $_SERVER['REMOTE_ADDR'] = '1.2.3.4';
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_SERVER['HTTP_CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+        $_SERVER['QUERY_STRING'] = 'name=test_dry_run_alias&type=host&dry_run=invalid';
+
+        $endpoint = new FirewallAliasEndpoint();
+        $json_resp = json_decode($endpoint->process_request());
+        $this->assert_equals($json_resp->response_id, 'ENDPOINT_DRY_RUN_FIELD_INVALID_TYPE');
+    }
+
+    /**
+     * Ensures the `dry_run` common control parameter is rejected on GET requests.
+     */
+    public function test_dry_run_rejected_on_get(): void {
+        $_SERVER['PHP_AUTH_USER'] = 'admin';
+        $_SERVER['PHP_AUTH_PW'] = 'pfsense';
+        $_SERVER['REMOTE_ADDR'] = '1.2.3.4';
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $_SERVER['HTTP_CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+        $_SERVER['HTTP_PREFER'] = 'dry-run';
+        $_SERVER['QUERY_STRING'] = '';
+
+        $endpoint = new FirewallAliasesEndpoint();
+        $json_resp = json_decode($endpoint->process_request());
+        $this->assert_equals($json_resp->response_id, 'ENDPOINT_DRY_RUN_NOT_SUPPORTED_ON_GET');
+        unset($_SERVER['HTTP_PREFER']);
+    }
+
+    /**
+     * Ensures that when `dry_run` is `true` via the request body, a POST request is fully validated but no
+     * Model object is actually created.
+     */
+    public function test_dry_run_post_does_not_persist(): void {
+        $_SERVER['PHP_AUTH_USER'] = 'admin';
+        $_SERVER['PHP_AUTH_PW'] = 'pfsense';
+        $_SERVER['REMOTE_ADDR'] = '1.2.3.4';
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_SERVER['HTTP_CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+        $_SERVER['HTTP_ACCEPT'] = 'application/json';
+
+        $unique_name = 'dry_run_alias';
+
+        # Capture the existing aliases before the dry_run request
+        $before_count = count(FirewallAlias::read_all()->model_objects);
+
+        # Submit a valid create request as a dry_run
+        $_SERVER['QUERY_STRING'] = "name=$unique_name&type=host&dry_run=true";
+        $endpoint = new FirewallAliasEndpoint();
+        $json_resp = json_decode($endpoint->process_request());
+        var_dump($json_resp);
+        $this->assert_equals($json_resp->code, 200);
+
+        # Ensure no new alias was actually persisted
+        $after = FirewallAlias::read_all();
+        $this->assert_equals(count($after->model_objects), $before_count);
+        $this->assert_is_empty($after->query(name: $unique_name)->model_objects);
+    }
+
+    /**
+     * Ensures that a `Prefer: dry-run` header enables dry_run mode even when not present in the request body.
+     */
+    public function test_dry_run_via_prefer_header(): void {
+        $_SERVER['PHP_AUTH_USER'] = 'admin';
+        $_SERVER['PHP_AUTH_PW'] = 'pfsense';
+        $_SERVER['REMOTE_ADDR'] = '1.2.3.4';
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_SERVER['HTTP_CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+        $_SERVER['HTTP_ACCEPT'] = 'application/json';
+        $_SERVER['HTTP_PREFER'] = 'dry-run';
+        $_SERVER['QUERY_STRING'] = 'name=prefer_dry_run_alias&type=host';
+
+        $endpoint = new FirewallAliasEndpoint();
+        $endpoint->process_request();
+        $this->assert_is_true($endpoint->dry_run);
+        $this->assert_is_true($endpoint->model->dry_run);
+
+        # Ensure the alias was NOT actually persisted
+        $this->assert_is_empty(FirewallAlias::query(name: 'prefer_dry_run_alias')->model_objects);
+        unset($_SERVER['HTTP_PREFER']);
+    }
 }
