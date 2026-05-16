@@ -96,6 +96,7 @@ jobs:
 
       - name: Fetch schemas from pfSense
         run: |
+          curl -s -k -u admin:pfsense -X GET https://pfSense-${{ env.DEFAULT_PFSENSE_VERSION }}-RELEASE.actions.pfrest.org/api/v2/schema/native > native.json
           curl -s -k -u admin:pfsense -X GET https://pfSense-${{ env.DEFAULT_PFSENSE_VERSION }}-RELEASE.actions.pfrest.org/api/v2/schema/openapi > openapi.json
           curl -s -k -u admin:pfsense -X GET https://pfSense-${{ env.DEFAULT_PFSENSE_VERSION }}-RELEASE.actions.pfrest.org/api/v2/schema/graphql > schema.graphql
 
@@ -104,6 +105,12 @@ jobs:
         run: |
           /usr/local/bin/VBoxManage controlvm pfSense-${{ env.DEFAULT_PFSENSE_VERSION }}-RELEASE poweroff || true
           /usr/local/bin/VBoxManage snapshot pfSense-${{ env.DEFAULT_PFSENSE_VERSION }}-RELEASE restore initial
+
+      - name: Upload Native schema
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native.json
+          path: native.json
 
       - name: Upload OpenAPI schema
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -116,6 +123,14 @@ jobs:
         with:
           name: schema.graphql
           path: schema.graphql
+
+      - name: Release schemas
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          files: |
+            native.json
+            openapi.json
+            schema.graphql
 
   trigger_ansible_collection_build:
     runs-on: ubuntu-latest
