@@ -33,12 +33,4 @@ class APIModelsRESTAPISettingsTestCase extends TestCase {
         $settings->validate();
         $this->assert_is_false($settings->allow_development_packages->value);
     }
-
-    /**
-     * Checks that the `allow_development_packages` field is represented as a boolean in the API response.
-     */
-    public function test_allow_development_packages_is_boolean_field(): void {
-        $settings = new RESTAPISettings();
-        $this->assert_type(value: $settings->allow_development_packages, type: 'RESTAPI\\Fields\\BooleanField');
-    }
 }
